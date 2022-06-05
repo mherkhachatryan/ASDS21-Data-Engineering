@@ -5,9 +5,12 @@ from pyspark.ml.feature import VectorAssembler
 
 from pyspark.sql.types import StructType, StructField, FloatType
 
+from pyspark.context import SparkContext
+
 seed = 42
 # %%
-spark = SparkSession.builder.master("local[*]").appName("test").getOrCreate()
+sc = SparkContext()
+spark = SparkSession(sc)
 schema = StructType([
     StructField("weight_pounds", FloatType(), True),
     StructField("mother_age", FloatType(), True),
@@ -18,9 +21,11 @@ schema = StructType([
 ])
 label = "weight_pounds"
 # Read the data from BigQuery as a Spark Dataframe.
-natality_data = spark.read.format("csv").option(
-    "header", "true").schema(schema).load('natality_sample.csv')
+# %%
 
+natality_data = spark.read.format("bigquery").option(
+    "table", "natality_regression.regression_input").load()
+# %%
 # Create a view so that Spark SQL queries can be run against the data.
 natality_data.createOrReplaceTempView("natality")
 
@@ -45,7 +50,7 @@ clean_data_assamlbed = clean_data_assamlbed.select("features", label)
 # %%
 training_data, test_data = clean_data_assamlbed.randomSplit([0.8, 0.2], seed=seed)
 # %%
-# training_data.cache()
+training_data.cache()
 # %%
 # Construct a new LinearRegression object and fit the training data.
 simple_lr_model = LinearRegression(featuresCol="features", labelCol=label, maxIter=5, regParam=0.2, solver="normal")
@@ -90,6 +95,8 @@ new_data_assamlbed = assambler.transform(clean_data)
 new_data_assamlbed = new_data_assamlbed.select("features", label)
 # %%
 training_data_new, test_data_new = new_data_assamlbed.randomSplit([0.8, 0.2], seed=seed)
+# %%
+training_data_new.cache()
 # %%
 simple_lr_model_new = LinearRegression(featuresCol="features", labelCol=label, maxIter=5, regParam=0.2,
                                        solver="normal")
